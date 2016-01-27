@@ -5,6 +5,7 @@ import android.text.TextWatcher;
 import android.widget.EditText;
 
 import com.andreabaccega.formedittextvalidator.Validator;
+import com.andreabaccega.widget.async.AsyncValidatorCallback;
 
 /**
  * Interface for encapsulating validation of an EditText control
@@ -32,7 +33,7 @@ public interface EditTextValidator {
 	/**
 	 * Resets the {@link Validator}s
 	 */
-	public void resetValidators(Context context);
+	public void resetValidators();
 
 	/**
 	 * Calling *testValidity()* will cause the EditText to go through
@@ -49,6 +50,8 @@ public interface EditTextValidator {
      * @return true if the validity passes false otherwise.
      */
     public boolean testValidity(boolean showUIError);
+
+	public void testValidityAsync(AsyncValidatorCallback asyncValidatorCallback);
 
     public void showUIError();
 
@@ -83,5 +86,7 @@ public interface EditTextValidator {
 	final int TEST_DATE = 14;
 	
 	final int TEST_NUMERIC_RANGE = 15;
+
+	final int TEST_ASYNC = 16;
 
 }

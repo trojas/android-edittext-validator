@@ -2,6 +2,7 @@ package com.andreabaccega.widget;
 
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.os.AsyncTask;
 import android.support.design.widget.TextInputLayout;
 import android.text.Editable;
 import android.text.TextUtils;
@@ -31,6 +32,8 @@ import com.andreabaccega.formedittextvalidator.PhoneValidator;
 import com.andreabaccega.formedittextvalidator.RegexpValidator;
 import com.andreabaccega.formedittextvalidator.Validator;
 import com.andreabaccega.formedittextvalidator.WebUrlValidator;
+import com.andreabaccega.widget.async.AsyncValidationContext;
+import com.andreabaccega.widget.async.AsyncValidatorCallback;
 
 /**
  * Default implementation of an {@link EditTextValidator}
@@ -54,6 +57,9 @@ public class DefaultEditTextValidator
   protected int maxNumber;
   private TextWatcher tw;
   private String defaultEmptyErrorString;
+  protected AsyncTask<AsyncValidationContext, Void, Void> asyncTask;
+  private AsyncValidationContext asyncValidationContext;
+  private Context context;
 
   /**
    * support dynamic new DefaultEditTextValidator() ,used for Java call
@@ -64,7 +70,8 @@ public class DefaultEditTextValidator
   public DefaultEditTextValidator(EditText editText, Context context) {
     testType = EditTextValidator.TEST_NOCHECK;
     setEditText(editText);
-    resetValidators(context);
+    this.context = context;
+    resetValidators();
   }
 
   public DefaultEditTextValidator(EditText editText, AttributeSet attrs, Context context) {
@@ -83,8 +90,8 @@ public class DefaultEditTextValidator
     typedArray.recycle();
 
     setEditText(editText);
-    resetValidators(context);
-
+    this.context = context;
+    resetValidators();
   }
 
   @Override
@@ -157,146 +164,173 @@ public class DefaultEditTextValidator
   }
 
   @Override
-  public void resetValidators(Context context) {
-    // its possible the context may have changed so re-get the defaultEmptyErrorString
-    defaultEmptyErrorString = context.getString(R.string.error_field_must_not_be_empty);
-    setEmptyErrorString(emptyErrorString);
+  public void resetValidators() {
 
-    mValidator = new AndValidator();
-    Validator toAdd;
-
-    switch (testType) {
-      default:
-      case TEST_NOCHECK:
-        toAdd = new DummyValidator();
-        break;
-
-      case TEST_ALPHA:
-        toAdd =
-            new AlphaValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_only_standard_letters_are_allowed)
-                : testErrorString);
-        break;
-      case TEST_ALPHANUMERIC:
-        toAdd =
-            new AlphaNumericValidator(
-                TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_this_field_cannot_contain_special_character)
-                    : testErrorString);
-        break;
-
-      case TEST_NUMERIC:
-        toAdd =
-            new NumericValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_only_numeric_digits_allowed)
-                : testErrorString);
-        break;
-      case TEST_NUMERIC_RANGE:
-        toAdd =
-            new NumericRangeValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_only_numeric_digits_range_allowed, minNumber, maxNumber)
-                : testErrorString, minNumber, maxNumber);
-        break;
-      case TEST_REGEXP:
-
-        toAdd = new RegexpValidator(testErrorString, customRegexp);
-        break;
-      case TEST_CREDITCARD:
-        toAdd =
-            new CreditCardValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_creditcard_number_not_valid)
-                : testErrorString);
-        break;
-      case TEST_EMAIL:
-        toAdd =
-            new EmailValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_email_address_not_valid)
-                : testErrorString);
-        break;
-      case TEST_PHONE:
-        toAdd =
-            new PhoneValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_phone_not_valid) : testErrorString);
-        break;
-      case TEST_DOMAINNAME:
-        toAdd =
-            new DomainValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_domain_not_valid)
-                : testErrorString);
-        break;
-      case TEST_IPADDRESS:
-        toAdd =
-            new IpAddressValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_ip_not_valid) : testErrorString);
-        break;
-      case TEST_WEBURL:
-        toAdd =
-            new WebUrlValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_url_not_valid) : testErrorString);
-        break;
-      case TEST_PERSONNAME:
-        toAdd =
-            new PersonNameValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_notvalid_personname) : testErrorString);
-        break;
-      case TEST_PERSONFULLNAME:
-        toAdd =
-            new PersonFullNameValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_notvalid_personfullname) : testErrorString);
-        break;
-
-      case TEST_CUSTOM:
-        // must specify the fully qualified class name & an error message
-
-        if ( classType == null ) {
-          throw new RuntimeException("Trying to create a custom validator but no classType has been specified.");
-        }
-        if ( TextUtils.isEmpty(testErrorString) ) {
-          throw new RuntimeException(String.format("Trying to create a custom validator (%s) but no error string specified.", classType));
-        }
-
-        Class<? extends Validator> customValidatorClass;
-        try {
-          Class<?> loadedClass = this.getClass().getClassLoader().loadClass(classType);
-
-          if ( ! Validator.class.isAssignableFrom(loadedClass) ) {
-            throw new RuntimeException(String.format("Custom validator (%s) does not extend %s", classType, Validator.class.getName()));
-          }
-          customValidatorClass = (Class<? extends Validator>) loadedClass;
-        } catch (ClassNotFoundException e) {
-          throw new RuntimeException(String.format("Unable to load class for custom validator (%s).", classType));
-        }
-
-        try {
-          toAdd = customValidatorClass.getConstructor(String.class).newInstance(testErrorString);
-        } catch (Exception e) {
-          throw new RuntimeException(String.format("Unable to construct custom validator (%s) with argument: %s", classType,
-              testErrorString));
-        }
-
-        break;
-
-      case TEST_DATE:
-        toAdd = new DateValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_date_not_valid) : testErrorString, customFormat);
-        break;
-    }
-
-    MultiValidator tmpValidator;
-    if ( ! emptyAllowed ) { // If the xml tells us that this is a required field, we will add the EmptyValidator.
-      tmpValidator = new AndValidator();
-      tmpValidator.enqueue(new EmptyValidator(emptyErrorStringActual));
-      tmpValidator.enqueue(toAdd);
+    if (testType == TEST_ASYNC) {
+      if ( classType == null ) {
+        throw new RuntimeException("Trying to create an async validator but no classType has been specified.");
+      }
     } else {
-      tmpValidator = new OrValidator(toAdd.getErrorMessage(), new NotValidator(null, new EmptyValidator(null)), toAdd);
-    }
+      // its possible the context may have changed so re-get the defaultEmptyErrorString
+      defaultEmptyErrorString = context.getString(R.string.error_field_must_not_be_empty);
+      setEmptyErrorString(emptyErrorString);
 
-    addValidator(tmpValidator);
+      mValidator = new AndValidator();
+      Validator toAdd;
+
+      switch (testType) {
+        default:
+        case TEST_NOCHECK:
+          toAdd = new DummyValidator();
+          break;
+
+        case TEST_ALPHA:
+          toAdd =
+                  new AlphaValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_only_standard_letters_are_allowed)
+                          : testErrorString);
+          break;
+        case TEST_ALPHANUMERIC:
+          toAdd =
+                  new AlphaNumericValidator(
+                          TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_this_field_cannot_contain_special_character)
+                                  : testErrorString);
+          break;
+
+        case TEST_NUMERIC:
+          toAdd =
+                  new NumericValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_only_numeric_digits_allowed)
+                          : testErrorString);
+          break;
+        case TEST_NUMERIC_RANGE:
+          toAdd =
+                  new NumericRangeValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_only_numeric_digits_range_allowed, minNumber, maxNumber)
+                          : testErrorString, minNumber, maxNumber);
+          break;
+        case TEST_REGEXP:
+
+          toAdd = new RegexpValidator(testErrorString, customRegexp);
+          break;
+        case TEST_CREDITCARD:
+          toAdd =
+                  new CreditCardValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_creditcard_number_not_valid)
+                          : testErrorString);
+          break;
+        case TEST_EMAIL:
+          toAdd =
+                  new EmailValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_email_address_not_valid)
+                          : testErrorString);
+          break;
+        case TEST_PHONE:
+          toAdd =
+                  new PhoneValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_phone_not_valid) : testErrorString);
+          break;
+        case TEST_DOMAINNAME:
+          toAdd =
+                  new DomainValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_domain_not_valid)
+                          : testErrorString);
+          break;
+        case TEST_IPADDRESS:
+          toAdd =
+                  new IpAddressValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_ip_not_valid) : testErrorString);
+          break;
+        case TEST_WEBURL:
+          toAdd =
+                  new WebUrlValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_url_not_valid) : testErrorString);
+          break;
+        case TEST_PERSONNAME:
+          toAdd =
+                  new PersonNameValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_notvalid_personname) : testErrorString);
+          break;
+        case TEST_PERSONFULLNAME:
+          toAdd =
+                  new PersonFullNameValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_notvalid_personfullname) : testErrorString);
+          break;
+
+        case TEST_CUSTOM:
+          // must specify the fully qualified class name & an error message
+
+          if ( classType == null ) {
+            throw new RuntimeException("Trying to create a custom validator but no classType has been specified.");
+          }
+          if ( TextUtils.isEmpty(testErrorString) ) {
+            throw new RuntimeException(String.format("Trying to create a custom validator (%s) but no error string specified.", classType));
+          }
+
+          Class<? extends Validator> customValidatorClass;
+          try {
+            Class<?> loadedClass = this.getClass().getClassLoader().loadClass(classType);
+
+            if ( ! Validator.class.isAssignableFrom(loadedClass) ) {
+              throw new RuntimeException(String.format("Custom validator (%s) does not extend %s", classType, Validator.class.getName()));
+            }
+            customValidatorClass = (Class<? extends Validator>) loadedClass;
+          } catch (ClassNotFoundException e) {
+            throw new RuntimeException(String.format("Unable to load class for custom validator (%s).", classType));
+          }
+
+          try {
+            toAdd = customValidatorClass.getConstructor(String.class).newInstance(testErrorString);
+          } catch (Exception e) {
+            throw new RuntimeException(String.format("Unable to construct custom validator (%s) with argument: %s", classType,
+                    testErrorString));
+          }
+
+          break;
+
+        case TEST_DATE:
+          toAdd = new DateValidator(TextUtils.isEmpty(testErrorString) ? context.getString(R.string.error_date_not_valid) : testErrorString, customFormat);
+          break;
+      }
+
+      MultiValidator tmpValidator;
+      if ( ! emptyAllowed ) { // If the xml tells us that this is a required field, we will add the EmptyValidator.
+        tmpValidator = new AndValidator();
+        tmpValidator.enqueue(new EmptyValidator(emptyErrorStringActual));
+        tmpValidator.enqueue(toAdd);
+      } else {
+        tmpValidator = new OrValidator(toAdd.getErrorMessage(), new NotValidator(null, new EmptyValidator(null)), toAdd);
+      }
+
+      addValidator(tmpValidator);
+    }
   }
 
-  public void setClassType(String classType, String testErrorString, Context context) {
+  private void createAsyncTaskInstance() {
+    Class<? extends AsyncTask<AsyncValidationContext, Void, Void>> asyncValidatorClass;
+    try {
+      Class<?> loadedClass = this.getClass().getClassLoader().loadClass(classType);
+
+      if ( ! AsyncTask.class.isAssignableFrom(loadedClass) ) {
+        throw new RuntimeException(String.format("Async validator (%s) does not extend %s", classType, AsyncTask.class.getName()));
+      }
+      asyncValidatorClass = (Class<? extends AsyncTask<AsyncValidationContext, Void, Void>>) loadedClass;
+    } catch (ClassNotFoundException e) {
+      throw new RuntimeException(String.format("Unable to load class for async validator (%s).", classType));
+    }
+
+    try {
+      asyncTask = asyncValidatorClass.getConstructor(Context.class).newInstance(context);
+    } catch (Exception e) {
+      throw new RuntimeException(String.format("Unable to construct async validator (%s)", classType));
+    }
+  }
+
+  public void setClassType(String classType, String testErrorString) {
     testType = EditTextValidator.TEST_CUSTOM;
     this.classType = classType;
     this.testErrorString = testErrorString;
-    resetValidators(context);
+    resetValidators();
   }
 
-  public void setCustomRegexp(String customRegexp, Context context) {
+  public void setCustomRegexp(String customRegexp) {
     testType = EditTextValidator.TEST_REGEXP;
     this.customRegexp = customRegexp;
-    resetValidators(context);
+    resetValidators();
   }
 
-  public void setEmptyAllowed(boolean emptyAllowed, Context context) {
+  public void setEmptyAllowed(boolean emptyAllowed) {
     this.emptyAllowed = emptyAllowed;
-    resetValidators(context);
+    resetValidators();
   }
 
   public void setEmptyErrorString(String emptyErrorString) {
@@ -307,14 +341,14 @@ public class DefaultEditTextValidator
     }
   }
 
-  public void setTestErrorString(String testErrorString, Context context) {
+  public void setTestErrorString(String testErrorString) {
     this.testErrorString = testErrorString;
-    resetValidators(context);
+    resetValidators();
   }
 
-  public void setTestType(int testType, Context context) {
+  public void setTestType(int testType) {
     this.testType = testType;
-    resetValidators(context);
+    resetValidators();
   }
 
   @Override
@@ -329,6 +363,13 @@ public class DefaultEditTextValidator
       showUIError();
     }
     return isValid;
+  }
+
+  @Override
+  public void testValidityAsync(AsyncValidatorCallback asyncValidatorCallback) {
+    createAsyncTaskInstance();
+    asyncValidationContext = new AsyncValidationContext(editText.getText().toString(), asyncValidatorCallback);
+    asyncTask.execute(asyncValidationContext);
   }
 
   @Override
@@ -352,6 +393,4 @@ public class DefaultEditTextValidator
       return ! TextUtils.isEmpty(editText.getError());
     }
   }
-
-
 }

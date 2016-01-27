@@ -1,16 +1,28 @@
 package com.andreabaccega.widget;
 
+import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
+import android.preference.DialogPreference;
 import android.preference.EditTextPreference;
+import android.preference.PreferenceManager;
+import android.support.design.widget.TextInputLayout;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.TextView.OnEditorActionListener;
+
+import com.andreabaccega.widget.async.AsyncValidatorCallback;
+import com.andreabaccega.widget.async.DefaultAsyncValidatorCallback;
 
 /**
  * A validating {@link EditTextPreference} validation is performed when the OK
@@ -18,6 +30,9 @@ import android.widget.TextView.OnEditorActionListener;
  * message is displayed and the EditTextPreference is not dismissed
  */
 public class ValidatingEditTextPreference extends EditTextPreference {
+
+	private boolean isAsync = false;
+
 	public ValidatingEditTextPreference(Context context) {
 		super(context);
 		// FIXME how should this constructor be handled
@@ -28,6 +43,9 @@ public class ValidatingEditTextPreference extends EditTextPreference {
 		super(context, attrs);
 		editTextValidator = new DefaultEditTextValidator(getEditText(), attrs,
 				context);
+		if (((DefaultEditTextValidator)editTextValidator).getTestType() == EditTextValidator.TEST_ASYNC) {
+			isAsync = true;
+		}
 	}
 
 	public ValidatingEditTextPreference(Context context, AttributeSet attrs,
@@ -35,6 +53,9 @@ public class ValidatingEditTextPreference extends EditTextPreference {
 		super(context, attrs, defStyle);
 		editTextValidator = new DefaultEditTextValidator(getEditText(), attrs,
 				context);
+		if (((DefaultEditTextValidator)editTextValidator).getTestType() == EditTextValidator.TEST_ASYNC) {
+			isAsync = true;
+		}
 	}
 
 	public EditTextValidator getEditTextValidator() {
@@ -94,46 +115,81 @@ public class ValidatingEditTextPreference extends EditTextPreference {
 
 		public void performValidation() {
 			getEditText().setError(null);
-			if (editTextValidator.testValidity()) {
-				// Dismiss once everything is OK.
-				theDialog.dismiss();
-				ValidatingEditTextPreference.this.onClick(theDialog,
-						AlertDialog.BUTTON_POSITIVE);
-
-				// reset padding - for when dialog is used again
-				if (originalBottomPadding != Integer.MIN_VALUE) {
-					LinearLayout parentLayout = (LinearLayout) getEditText()
-							.getParent();
-
-					if (originalBottomPadding == parentLayout
-							.getPaddingBottom()) {
-						parentLayout.setPadding(parentLayout.getPaddingLeft(),
-								parentLayout.getPaddingTop(),
-								parentLayout.getPaddingRight(),
-								originalBottomPadding);
+			if (isAsync) {
+				AsyncValidatorCallback callback = new DefaultAsyncValidatorCallback() {
+					@Override
+					public void isValid() {
+						processSuccess();
 					}
-				}
+
+					@Override
+					public void isNotValid(String errorMessage) {
+						try {
+							TextInputLayout parent = (TextInputLayout) getEditText().getParent();
+							parent.setErrorEnabled(true);
+							parent.setError(errorMessage);
+						} catch (Throwable e) {
+							getEditText().setError(errorMessage);
+						}
+						processFailure();
+					}
+				};
+				editTextValidator.testValidityAsync(callback);
 			} else {
+				if (editTextValidator.testValidity()) {
+					processSuccess();
 
-				// increase padding so error message doesn't cover buttons
-				if (originalBottomPadding != Integer.MIN_VALUE) {
-					LinearLayout parentLayout = (LinearLayout) getEditText()
-							.getParent();
-
-					if (originalBottomPadding == parentLayout
-							.getPaddingBottom()) {
-						parentLayout
-								.setPadding(
-										parentLayout.getPaddingLeft(),
-										parentLayout.getPaddingTop(),
-										parentLayout.getPaddingRight(),
-										(int) (parentLayout.getPaddingBottom() + getEditText()
-												.getHeight() * 1.05));
-					}
+				} else {
+					processFailure();
 				}
-
-				// don't dismiss the dialog
 			}
+		}
+
+		private void processSuccess() {
+
+			// Dismiss once everything is OK.
+			theDialog.dismiss();
+			ValidatingEditTextPreference.this.onClick(theDialog,
+					AlertDialog.BUTTON_POSITIVE);
+
+			// reset padding - for when dialog is used again
+			if (originalBottomPadding != Integer.MIN_VALUE) {
+				LinearLayout parentLayout = (LinearLayout) getEditText()
+						.getParent();
+
+				if (originalBottomPadding == parentLayout
+						.getPaddingBottom()) {
+					parentLayout.setPadding(parentLayout.getPaddingLeft(),
+							parentLayout.getPaddingTop(),
+							parentLayout.getPaddingRight(),
+							originalBottomPadding);
+				}
+			}
+			ValidatingEditTextPreference.this.notifyChanged();
+			ScrollView parentLayout = (ScrollView) getEditText()
+					.getParent().getParent();
+			parentLayout.invalidate();
+		}
+
+		private void processFailure() {
+			// increase padding so error message doesn't cover buttons
+			if (originalBottomPadding != Integer.MIN_VALUE) {
+				LinearLayout parentLayout = (LinearLayout) getEditText()
+						.getParent();
+
+				if (originalBottomPadding == parentLayout
+						.getPaddingBottom()) {
+					parentLayout
+							.setPadding(
+									parentLayout.getPaddingLeft(),
+									parentLayout.getPaddingTop(),
+									parentLayout.getPaddingRight(),
+									(int) (parentLayout.getPaddingBottom() + getEditText()
+											.getHeight() * 1.05));
+				}
+			}
+
+			// don't dismiss the dialog
 		}
 
 		private final int originalBottomPadding;
@@ -145,7 +201,6 @@ public class ValidatingEditTextPreference extends EditTextPreference {
 			performValidation();
 			return true;
 		}
-
 	}
 
 	private EditTextValidator editTextValidator;
