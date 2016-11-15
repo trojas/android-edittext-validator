@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="error_only_numeric_digits_allowed">只能輸入數字</string>
-    <string name="error_only_numeric_digits_range_allowed">只能輸入從 %1$s 到 %2$s 的數字</string>
+    <string name="error_only_numeric_digits_range_allowed">只能輸入從 %1$d 到 %2$d 的數字</string>
     <string name="error_this_field_cannot_contain_special_character">不允許包含任何特殊字符</string>
     <string name="error_only_standard_letters_are_allowed">只能輸入標準字符</string>
     <string name="error_field_must_not_be_empty">輸入不能為空</string>

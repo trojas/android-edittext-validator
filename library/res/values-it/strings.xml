@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 	<string name="error_only_numeric_digits_allowed">Inserire solamente numeri</string>
+	<string name="error_only_numeric_digits_range_allowed">%1$d - %2$d</string>
 	<string name="error_this_field_cannot_contain_special_character">Il campo non può contenere caratteri speciali</string>
 	<string name="error_only_standard_letters_are_allowed">Inserire solamente lettere</string>
 	<string name="error_field_must_not_be_empty">Il campo non può essere vuoto</string>
