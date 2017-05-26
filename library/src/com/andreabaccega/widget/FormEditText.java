@@ -7,6 +7,7 @@ import android.content.Context;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.support.v7.widget.AppCompatEditText;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
@@ -19,7 +20,7 @@ import com.andreabaccega.formedittextvalidator.Validator;
  *
  * @author Andrea Baccega <me@andreabaccega.com>
  */
-public class FormEditText extends EditText {
+public class FormEditText extends AppCompatEditText {
     public FormEditText(Context context) {
         super(context);
         //support dynamic new FormEditText(context)

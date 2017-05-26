@@ -23,7 +23,7 @@ public interface EditTextValidator {
 			throws IllegalArgumentException;
 
 	/**
-	 * This should be used with {@link #addTextChangedListener(TextWatcher)}. It
+	 * This should be used with {@link android.widget.EditText#addTextChangedListener(TextWatcher)}. It
 	 * fixes the non-hiding error popup behaviour.
 	 */
 	public TextWatcher getTextWatcher();
@@ -37,7 +37,7 @@ public interface EditTextValidator {
 
 	/**
 	 * Calling *testValidity()* will cause the EditText to go through
-	 * customValidators and call {@link #Validator.isValid(EditText)}
+	 * customValidators and call {@link Validator#isValid(EditText)}
 	 * Same as {@link #testValidity(boolean)} with first parameter true
 	 * @return true if the validity passes false otherwise.
 	 */
@@ -45,7 +45,7 @@ public interface EditTextValidator {
 
     /**
      * Calling *testValidity()* will cause the EditText to go through
-     * customValidators and call {@link #Validator.isValid(EditText)}
+     * customValidators and call {@link Validator#isValid(EditText)}
      * @param showUIError determines if this call should show the UI error.
      * @return true if the validity passes false otherwise.
      */

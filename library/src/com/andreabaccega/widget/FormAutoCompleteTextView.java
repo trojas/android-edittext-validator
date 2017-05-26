@@ -7,6 +7,7 @@ import android.content.Context;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.support.v7.widget.AppCompatAutoCompleteTextView;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
@@ -18,7 +19,7 @@ import android.widget.EditText;
  *
  * @author Said Tahsin Dane <tasomaniac@gmail.com>
  */
-public class FormAutoCompleteTextView extends AutoCompleteTextView {
+public class FormAutoCompleteTextView extends AppCompatAutoCompleteTextView {
     public FormAutoCompleteTextView(Context context) {
         super(context);
         // FIXME how should this constructor be handled
